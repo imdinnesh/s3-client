@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Server, HardDrive, UploadCloud } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -45,6 +45,24 @@ function App() {
   const addLog = (msg: string) => {
     setLogs(prev => [msg, ...prev]);
   };
+
+  // Poll system health every 2 seconds
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await axios.get('http://localhost:8080/status');
+        setNodes(res.data);
+      } catch (err) {
+        console.error("Failed to fetch status", err);
+        // If Gateway is down, mark all as dead? Or just log it.
+      }
+    };
+
+    fetchStatus(); // Run immediately
+    const interval = setInterval(fetchStatus, 2000); // Run every 2s
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-10 font-sans">
