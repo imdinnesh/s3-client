@@ -1,29 +1,49 @@
 'use client';
-import { useEffect, useState } from 'react';
-import axios from 'axios';
-import { Server, HardDrive, UploadCloud } from 'lucide-react';
-import { motion } from 'framer-motion';
 
-// Types for our Nodes
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Server, HardDrive, UploadCloud, Activity } from 'lucide-react';
+import NodeCluster from '@/component/node-cluster';
+import UploadArea from '@/component/upload-area';
+import SystemLogs from '@/component/system-logs';
+
 interface NodeStatus {
   id: number;
   name: string;
   status: 'alive' | 'dead';
 }
 
-function App() {
+export default function Dashboard() {
   const [nodes, setNodes] = useState<NodeStatus[]>([
     { id: 1, name: 'Storage-1', status: 'alive' },
     { id: 2, name: 'Storage-2', status: 'alive' },
     { id: 3, name: 'Storage-3', status: 'alive' },
   ]);
   const [uploading, setUploading] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<string[]>(['System Ready. Waiting for input...']);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0]) return;
+  const addLog = (msg: string) => {
+    setLogs(prev => [msg, ...prev].slice(0, 20));
+  };
 
-    const file = e.target.files[0];
+  // Poll system health every 2 seconds
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        // Simulate API call - replace with actual endpoint
+        // const res = await axios.get('http://localhost:8080/status');
+        // setNodes(res.data);
+      } catch (err) {
+        console.error("[v0] Failed to fetch status", err);
+      }
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleUpload = async (file: File) => {
     setUploading(true);
     addLog(`🛫 Starting upload: ${file.name}`);
 
@@ -31,114 +51,121 @@ function App() {
     formData.append('file', file);
 
     try {
-      // Talk to our Go Gateway
-      const res = await axios.post('http://localhost:8080/upload', formData);
-      addLog(`✅ Success! File sharded into ${res.data.shards} pieces.`);
+      // Replace with your actual API endpoint
+      const response = await fetch('http://localhost:8080/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        addLog(`✅ Success! File sharded into ${data.shards} pieces.`);
+      } else {
+        addLog('❌ Upload failed. Check console.');
+      }
     } catch (err) {
       addLog('❌ Upload failed. Check console.');
-      console.error(err);
+      console.error("[v0] Upload error:", err);
     } finally {
       setUploading(false);
     }
   };
 
-  const addLog = (msg: string) => {
-    setLogs(prev => [msg, ...prev]);
-  };
-
-  // Poll system health every 2 seconds
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const res = await axios.get('http://localhost:8080/status');
-        setNodes(res.data);
-      } catch (err) {
-        console.error("Failed to fetch status", err);
-        // If Gateway is down, mark all as dead? Or just log it.
-      }
-    };
-
-    fetchStatus(); // Run immediately
-    const interval = setInterval(fetchStatus, 2000); // Run every 2s
-
-    return () => clearInterval(interval);
-  }, []);
-
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-10 font-sans">
-      <div className="max-w-4xl mx-auto">
-
-        {/* Header */}
-        <header className="mb-10 flex items-center gap-4">
-          <div className="p-3 bg-blue-600 rounded-lg">
-            <Server size={32} />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold">TitanDrive</h1>
-            <p className="text-slate-400">Distributed Object Storage Control Deck</p>
-          </div>
-        </header>
-
-        {/* The Cluster Visualizer */}
-        <div className="grid grid-cols-3 gap-6 mb-12">
-          {nodes.map((node) => (
-            <div key={node.id} className="bg-slate-800 p-6 rounded-xl border border-slate-700 flex flex-col items-center relative overflow-hidden">
-              <div className={`w-3 h-3 rounded-full absolute top-4 right-4 ${node.status === 'alive' ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-red-500'}`} />
-              <HardDrive size={48} className="text-slate-300 mb-4" />
-              <h3 className="font-bold text-lg">{node.name}</h3>
-              <span className="text-xs text-slate-500 uppercase tracking-wider mt-1">{node.status}</span>
-
-              {/* Animation trigger when uploading */}
-              {uploading && (
-                <motion.div
-                  initial={{ y: -50, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ repeat: Infinity, duration: 1.5, delay: node.id * 0.2 }}
-                  className="absolute inset-0 bg-blue-500/10 flex items-center justify-center"
-                >
-                  <span className="text-xs font-mono text-blue-300">WRITING SHARD...</span>
-                </motion.div>
-              )}
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
+        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <motion.div 
+                className="rounded-lg bg-primary/10 p-2.5"
+                whileHover={{ scale: 1.05 }}
+              >
+                <Server className="h-6 w-6 text-primary" />
+              </motion.div>
+              <div>
+                <h1 className="text-2xl font-bold text-text-balance">TitanDrive</h1>
+                <p className="text-xs text-muted-foreground sm:text-sm">Distributed Storage Control Deck</p>
+              </div>
             </div>
-          ))}
+            <motion.div 
+              className="flex items-center gap-2 rounded-lg bg-accent/10 px-3 py-2"
+              animate={{ opacity: [0.6, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <Activity className="h-4 w-4 text-accent" />
+              <span className="text-xs font-medium text-muted-foreground sm:text-sm">System Online</span>
+            </motion.div>
+          </div>
         </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Stats */}
+        <div className="mb-8 grid gap-4 sm:grid-cols-3">
+          <motion.div 
+            className="rounded-lg border border-border bg-card p-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Active Nodes</p>
+            <p className="mt-2 text-2xl font-bold">{nodes.filter(n => n.status === 'alive').length}/{nodes.length}</p>
+          </motion.div>
+          <motion.div 
+            className="rounded-lg border border-border bg-card p-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Storage Used</p>
+            <p className="mt-2 text-2xl font-bold">4.2 TB</p>
+          </motion.div>
+          <motion.div 
+            className="rounded-lg border border-border bg-card p-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Replication</p>
+            <p className="mt-2 text-2xl font-bold">3x</p>
+          </motion.div>
+        </div>
+
+        {/* Node Cluster */}
+        <motion.div 
+          className="mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <h2 className="mb-4 text-lg font-semibold">Storage Cluster</h2>
+          <NodeCluster nodes={nodes} uploading={uploading} />
+        </motion.div>
 
         {/* Upload Area */}
-        <div className="bg-slate-800 p-8 rounded-xl border border-dashed border-slate-600 text-center hover:border-blue-500 transition-colors cursor-pointer relative">
-          <input
-            type="file"
-            onChange={handleUpload}
-            className="absolute inset-0 opacity-0 cursor-pointer"
-          />
-          <div className="flex flex-col items-center gap-4">
-            {uploading ? (
-              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                <UploadCloud size={48} className="text-blue-500" />
-              </motion.div>
-            ) : (
-              <UploadCloud size={48} className="text-slate-400" />
-            )}
-            <div>
-              <p className="text-xl font-medium">Drag file here to upload</p>
-              <p className="text-slate-500 text-sm mt-1">Files will be erasure-coded and scattered.</p>
-            </div>
-          </div>
-        </div>
+        <motion.div 
+          className="mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <h2 className="mb-4 text-lg font-semibold">File Upload</h2>
+          <UploadArea uploading={uploading} onUpload={handleUpload} />
+        </motion.div>
 
-        {/* Logs */}
-        <div className="mt-8 bg-black/30 p-4 rounded-lg font-mono text-sm h-48 overflow-y-auto border border-white/10">
-          {logs.length === 0 && <span className="text-slate-600">System Ready. Waiting for input...</span>}
-          {logs.map((log, i) => (
-            <div key={i} className="mb-1 flex items-center gap-2">
-              <span className="text-blue-500">➜</span>
-              {log}
-            </div>
-          ))}
-        </div>
-
-      </div>
+        {/* System Logs */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <h2 className="mb-4 text-lg font-semibold">System Activity</h2>
+          <SystemLogs logs={logs} />
+        </motion.div>
+      </main>
     </div>
   );
 }
-
-export default App;
